@@ -1,0 +1,228 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/*
+ * RHF Catering & Snack Box — design system
+ * Tokens transcribed from DesignRHF.md §29 (Tailwind tokens) and §30 (CSS variables).
+ * Brand is a single warm light theme; there is no dark mode.
+ */
+
+@theme {
+  /* Brand palette — DesignRHF §3 */
+  --color-rhf-orange: #f97316;
+  --color-rhf-deep-orange: #d85a00;
+  --color-rhf-cream: #fff4e6;
+  --color-rhf-white: #ffffff;
+  --color-rhf-charcoal: #2b2118;
+  --color-rhf-brown: #7a3e12;
+  --color-rhf-green: #6a8f3a;
+  --color-rhf-gold: #f5b041;
+  --color-rhf-soft-gray: #f7f3ee;
+  --color-rhf-border: #ead7c0;
+
+  /* Elevation — DesignRHF §9. Warm-tinted, never black. */
+  --shadow-rhf-sm: 0 4px 12px rgba(43, 33, 24, 0.06);
+  --shadow-rhf-md: 0 12px 28px rgba(43, 33, 24, 0.1);
+  --shadow-rhf-lg: 0 20px 48px rgba(43, 33, 24, 0.14);
+
+  /* Main content width — DesignRHF §7 */
+  --container-rhf: 1200px;
+
+  --text-2xs: 0.6875rem;
+}
+
+/*
+ * Semantic tokens. shadcn components read these, so binding them to the brand
+ * palette here is what makes every shadcn primitive come out on-brand without
+ * per-component overrides.
+ */
+:root {
+  --background: #fff4e6;
+  --foreground: #2b2118;
+
+  --card: #ffffff;
+  --card-foreground: #2b2118;
+
+  --popover: #ffffff;
+  --popover-foreground: #2b2118;
+
+  --primary: #f97316;
+  --primary-foreground: #ffffff;
+
+  --secondary: #fff4e6;
+  --secondary-foreground: #7a3e12;
+
+  --muted: #f7f3ee;
+  /* Charcoal softened toward cream: a warm secondary text tone that introduces
+     no new hue to the palette. */
+  --muted-foreground: color-mix(in oklab, #2b2118 72%, #fff4e6);
+
+  --accent: #fff4e6;
+  --accent-foreground: #d85a00;
+
+  --destructive: #b42318;
+
+  --border: #ead7c0;
+  --input: #ead7c0;
+  --ring: #f97316;
+
+  --radius: 1rem;
+
+  /* Admin sidebar — required by components/ui/sidebar.tsx.
+     shadcn ships these as neutral greys; left alone the admin panel would read
+     as a different product from the warm public site, so each one is bound to
+     an existing RHF token rather than a new colour. */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #2b2118;
+  --sidebar-primary: #d85a00;
+  --sidebar-primary-foreground: #ffffff;
+  /* Cream for the hover/active bed: the sidebar sits on white, so the brand
+     background colour becomes the highlight here rather than the page. */
+  --sidebar-accent: #fff4e6;
+  --sidebar-accent-foreground: #d85a00;
+  --sidebar-border: #ead7c0;
+  /* Matches the global focus outline further down this file. */
+  --sidebar-ring: #f97316;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans: var(--font-inter);
+  --font-mono: ui-monospace, monospace;
+  --font-heading: var(--font-poppins);
+
+  /* Exact radii from DesignRHF §8 rather than shadcn's multiplied scale. */
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-2xl: 32px;
+  --radius-3xl: 32px;
+  --radius-4xl: 32px;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply font-sans;
+    scroll-behavior: smooth;
+    /* Offset anchored sections so the sticky header does not cover them. */
+    scroll-padding-top: 6rem;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-size: 1rem;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-heading text-balance;
+    color: var(--foreground);
+  }
+
+  h1 {
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  h2 {
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Visible, on-brand focus for keyboard users — DesignRHF §27. */
+  :focus-visible {
+    outline: 2px solid var(--color-rhf-orange);
+    outline-offset: 2px;
+  }
+}
+
+@utility container-rhf {
+  width: 100%;
+  max-width: var(--container-rhf);
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+
+  @media (width >= 768px) {
+    padding-inline: 2rem;
+  }
+}
+
+/* Section rhythm — DesignRHF §7: 48-64px mobile, 64-80px tablet, 80-96px desktop. */
+@utility section-y {
+  padding-block: 3.5rem;
+
+  @media (width >= 768px) {
+    padding-block: 5rem;
+  }
+
+  @media (width >= 1024px) {
+    padding-block: 5.5rem;
+  }
+}
+
+/* Card hover — DesignRHF §26. Suppressed for reduced-motion users. */
+@utility card-lift {
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-rhf-md);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

@@ -1,0 +1,226 @@
+// RHF Catering & Snack Box — database schema
+//
+// Mirrors the data model in PRDRhf.md §17. Written now so round 2 (the admin
+// panel) is additive rather than a redesign; no application code reads from
+// the database yet.
+//
+// Target: PostgreSQL on Neon or Supabase. Set DATABASE_URL, then:
+//   npx prisma migrate dev --name init
+//   npm run db:seed
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+// Prisma 7 no longer accepts `url` here — the connection string for migrate
+// lives in prisma.config.ts, and the runtime client is given a driver adapter.
+datasource db {
+  provider = "postgresql"
+}
+
+enum AdminRole {
+  ADMIN
+  EDITOR
+}
+
+/// Admin panel user — PRD §17.1. Passwords are stored hashed (PRD §21).
+model AdminUser {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         AdminRole @default(ADMIN)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("admin_users")
+}
+
+/// Failed admin login attempts — PRD §21 requires rate limiting on login.
+///
+/// Kept in the database rather than in memory on purpose: on Vercel each
+/// serverless instance has its own memory, so an in-process counter would reset
+/// whenever a request landed on a cold instance — which is exactly the moment
+/// an attacker benefits from. Only failures are recorded; a successful login
+/// clears the row set for that email.
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  email     String
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@map("login_attempts")
+}
+
+/// Service category — PRD §17.2.
+model MenuCategory {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  description String?
+  /// Icon key resolved by <CategoryIcon>; stored as a string so it survives
+  /// the round trip and can be chosen from a dropdown in the admin panel.
+  icon        String?
+  sortOrder   Int     @default(0)
+  isPublished Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  menuItems MenuItemCategory[]
+
+  @@index([isPublished, sortOrder])
+  @@map("menu_categories")
+}
+
+/// Package/menu item — PRD §17.3.
+model MenuItem {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  /// The one description. The catalogue card shows a 160-character excerpt of
+  /// it, derived in `toMenuItem` — there is deliberately no second column to
+  /// keep in sync, because the two drifted apart the moment either was edited.
+  description      String
+  /// Numeric price in rupiah; null when the package is quote-only. Also what
+  /// the catalogue sorts by.
+  price            Int?
+  /// Unit the price is quoted in — "box" or "pax". Null exactly when `price`
+  /// is null; together they produce the customer-facing label in the mapper.
+  priceUnit        String?
+  minOrder         String?
+  packageItems     String[] @default([])
+  imageUrl         String?
+  galleryImages    String[] @default([])
+  tags             String[] @default([])
+  suitableFor      String?
+  isFeatured       Boolean  @default(false)
+  isPublished      Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  seoTitle         String?
+  seoDescription   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  categories MenuItemCategory[]
+
+  @@index([isPublished, sortOrder])
+  @@index([isFeatured, isPublished])
+  @@map("menu_items")
+}
+
+/// Join table for the many-to-many in PRD §8.2: one package legitimately
+/// belongs to several categories (a nasi box is also a Paket Rapat/Dinas and a
+/// Paket Sekolah). Modelled as a relation rather than an array so category
+/// filtering stays a join.
+model MenuItemCategory {
+  menuItemId String
+  categoryId String
+
+  menuItem MenuItem     @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  category MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([menuItemId, categoryId])
+  @@index([categoryId])
+  @@map("menu_item_categories")
+}
+
+/// Gallery photo — PRD §17.4.
+model GalleryItem {
+  id          String  @id @default(cuid())
+  title       String?
+  caption     String?
+  imageUrl    String?
+  category    String?
+  sortOrder   Int     @default(0)
+  isPublished Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isPublished, sortOrder])
+  @@map("gallery_items")
+}
+
+/// Customer testimonial — PRD §17.5.
+model Testimonial {
+  id           String  @id @default(cuid())
+  customerName String
+  customerType String?
+  message      String
+  rating       Int?
+  imageUrl     String?
+  sortOrder    Int     @default(0)
+  isPublished  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isPublished, sortOrder])
+  @@map("testimonials")
+}
+
+/// Named client — PRD §17.6.
+///
+/// DesignRHF §21 forbids publishing a client's name or logo without consent,
+/// so `isPublished` defaults to false here: a record must be opted in
+/// deliberately rather than going live the moment it is created.
+model Client {
+  id          String  @id @default(cuid())
+  name        String
+  category    String?
+  logoUrl     String?
+  sortOrder   Int     @default(0)
+  isPublished Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isPublished, sortOrder])
+  @@map("clients")
+}
+
+/// FAQ entry — PRD §17.7.
+model Faq {
+  id          String  @id @default(cuid())
+  question    String
+  answer      String
+  sortOrder   Int     @default(0)
+  isPublished Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isPublished, sortOrder])
+  @@map("faqs")
+}
+
+/// Site-wide settings — PRD §17.8.
+///
+/// A single row, pinned to id "default" so the admin panel always edits the
+/// same record and no second row can drift into existence.
+model SiteSettings {
+  id               String  @id @default("default")
+  brandName        String
+  tagline          String
+  whatsappNumber   String
+  whatsappTemplate String
+  location         String
+  serviceArea      String
+  businessHours    String?
+  instagramUrl     String?
+  tiktokUrl        String?
+  facebookUrl      String?
+  email            String?
+  logoUrl          String?
+  faviconUrl       String?
+  seoTitle         String
+  seoDescription   String
+
+  updatedAt DateTime @updatedAt
+
+  @@map("site_settings")
+}
