@@ -45,3 +45,10 @@ next-env.d.ts
 
 # prisma — regenerate with `npm run db:generate`
 /src/generated/
+
+# documentation — kept on disk, not in the repo. Only the README ships.
+# PRD, design notes, and the per-stage specs are working documents; AGENTS.md
+# and CLAUDE.md are rewritten locally by tooling and would churn every commit.
+*.md
+!README.md
+/docs/
