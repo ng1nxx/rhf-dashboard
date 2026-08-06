@@ -1,35 +1,38 @@
 /**
- * Prisma client singleton.
+ * Prisma client singleton, pointed at Turso.
  *
  * Prisma 7 no longer accepts a connection string on the client directly — the
  * Rust engine is gone and the query compiler needs a driver adapter, so the
- * `pg` pool is handed over explicitly via `PrismaPg`.
+ * libSQL client is handed over explicitly via `PrismaLibSql`.
  *
- * The instance is cached on `globalThis` because `next dev` re-evaluates
- * modules on every hot reload; without the cache each reload would open a new
- * pool and Supabase would run out of connections within a few edits.
+ * Turso is libSQL, which is SQLite. Two consequences worth knowing about:
+ * there is no connection pool to exhaust (every query is an HTTP request), and
+ * writes are serialised — fine for a panel one person edits at a time.
  *
- * `DATABASE_URL` points at Supabase's pgBouncer pooler (port 6543) and must
- * carry `?pgbouncer=true`. Migrations use `DIRECT_URL` instead — see
- * `prisma.config.ts`.
+ * The instance is still cached on `globalThis` because `next dev` re-evaluates
+ * modules on every hot reload, and a fresh client per reload means a fresh
+ * client per hot key press.
+ *
+ * The Prisma CLI cannot reach this database; see `prisma.config.ts`.
  */
-import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaLibSql } from "@prisma/adapter-libsql";
 
 import { PrismaClient } from "@/generated/prisma/client";
 
 function createPrismaClient() {
-  const connectionString = process.env.DATABASE_URL;
+  const url = process.env.TURSO_DATABASE_URL;
+  const authToken = process.env.TURSO_AUTH_TOKEN;
 
-  if (!connectionString) {
+  if (!url || !authToken) {
     // Failing loudly here beats a confusing driver error six frames deep, and
     // it is the exact symptom of a Vercel build with no env var configured.
     throw new Error(
-      "DATABASE_URL belum diset. Salin .env.example ke .env.local dan isi connection string dari Supabase.",
+      "TURSO_DATABASE_URL / TURSO_AUTH_TOKEN belum diset. Salin .env.example ke .env.local dan isi kredensial dari dashboard Turso.",
     );
   }
 
   return new PrismaClient({
-    adapter: new PrismaPg({ connectionString }),
+    adapter: new PrismaLibSql({ url, authToken }),
   });
 }
 

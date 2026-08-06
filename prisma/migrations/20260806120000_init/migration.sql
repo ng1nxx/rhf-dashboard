@@ -1,58 +1,56 @@
--- CreateEnum
-CREATE TYPE "AdminRole" AS ENUM ('ADMIN', 'EDITOR');
-
 -- CreateTable
 CREATE TABLE "admin_users" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "passwordHash" TEXT NOT NULL,
-    "role" "AdminRole" NOT NULL DEFAULT 'ADMIN',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "role" TEXT NOT NULL DEFAULT 'ADMIN',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
 
-    CONSTRAINT "admin_users_pkey" PRIMARY KEY ("id")
+-- CreateTable
+CREATE TABLE "login_attempts" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "email" TEXT NOT NULL,
+    "ipAddress" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- CreateTable
 CREATE TABLE "menu_categories" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "description" TEXT,
     "icon" TEXT,
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "isPublished" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "menu_categories_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
 );
 
 -- CreateTable
 CREATE TABLE "menu_items" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
-    "shortDescription" TEXT NOT NULL,
-    "description" TEXT,
+    "description" TEXT NOT NULL,
     "price" INTEGER,
-    "priceLabel" TEXT NOT NULL,
+    "priceUnit" TEXT,
     "minOrder" TEXT,
-    "packageItems" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "packageItems" TEXT NOT NULL DEFAULT '[]',
     "imageUrl" TEXT,
-    "galleryImages" TEXT[] DEFAULT ARRAY[]::TEXT[],
-    "tags" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "galleryImages" TEXT NOT NULL DEFAULT '[]',
+    "tags" TEXT NOT NULL DEFAULT '[]',
     "suitableFor" TEXT,
     "isFeatured" BOOLEAN NOT NULL DEFAULT false,
     "isPublished" BOOLEAN NOT NULL DEFAULT true,
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "seoTitle" TEXT,
     "seoDescription" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "menu_items_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
 );
 
 -- CreateTable
@@ -60,27 +58,27 @@ CREATE TABLE "menu_item_categories" (
     "menuItemId" TEXT NOT NULL,
     "categoryId" TEXT NOT NULL,
 
-    CONSTRAINT "menu_item_categories_pkey" PRIMARY KEY ("menuItemId","categoryId")
+    PRIMARY KEY ("menuItemId", "categoryId"),
+    CONSTRAINT "menu_item_categories_menuItemId_fkey" FOREIGN KEY ("menuItemId") REFERENCES "menu_items" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "menu_item_categories_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "menu_categories" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
 CREATE TABLE "gallery_items" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "title" TEXT,
     "caption" TEXT,
     "imageUrl" TEXT,
     "category" TEXT,
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "isPublished" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "gallery_items_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
 );
 
 -- CreateTable
 CREATE TABLE "testimonials" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "customerName" TEXT NOT NULL,
     "customerType" TEXT,
     "message" TEXT NOT NULL,
@@ -88,42 +86,36 @@ CREATE TABLE "testimonials" (
     "imageUrl" TEXT,
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "isPublished" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "testimonials_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
 );
 
 -- CreateTable
 CREATE TABLE "clients" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "category" TEXT,
     "logoUrl" TEXT,
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "isPublished" BOOLEAN NOT NULL DEFAULT false,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "clients_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
 );
 
 -- CreateTable
 CREATE TABLE "faqs" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "question" TEXT NOT NULL,
     "answer" TEXT NOT NULL,
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "isPublished" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "faqs_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
 );
 
 -- CreateTable
 CREATE TABLE "site_settings" (
-    "id" TEXT NOT NULL DEFAULT 'default',
+    "id" TEXT NOT NULL PRIMARY KEY DEFAULT 'default',
     "brandName" TEXT NOT NULL,
     "tagline" TEXT NOT NULL,
     "whatsappNumber" TEXT NOT NULL,
@@ -139,13 +131,14 @@ CREATE TABLE "site_settings" (
     "faviconUrl" TEXT,
     "seoTitle" TEXT NOT NULL,
     "seoDescription" TEXT NOT NULL,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "site_settings_pkey" PRIMARY KEY ("id")
+    "updatedAt" DATETIME NOT NULL
 );
 
 -- CreateIndex
 CREATE UNIQUE INDEX "admin_users_email_key" ON "admin_users"("email");
+
+-- CreateIndex
+CREATE INDEX "login_attempts_email_createdAt_idx" ON "login_attempts"("email", "createdAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "menu_categories_slug_key" ON "menu_categories"("slug");
@@ -176,9 +169,3 @@ CREATE INDEX "clients_isPublished_sortOrder_idx" ON "clients"("isPublished", "so
 
 -- CreateIndex
 CREATE INDEX "faqs_isPublished_sortOrder_idx" ON "faqs"("isPublished", "sortOrder");
-
--- AddForeignKey
-ALTER TABLE "menu_item_categories" ADD CONSTRAINT "menu_item_categories_menuItemId_fkey" FOREIGN KEY ("menuItemId") REFERENCES "menu_items"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "menu_item_categories" ADD CONSTRAINT "menu_item_categories_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "menu_categories"("id") ON DELETE CASCADE ON UPDATE CASCADE;

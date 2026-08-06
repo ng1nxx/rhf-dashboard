@@ -46,6 +46,16 @@ next-env.d.ts
 # prisma — regenerate with `npm run db:generate`
 /src/generated/
 
+# Scratch SQLite file that `prisma migrate dev` diffs against. Not the real
+# database — the application always talks to Turso. See prisma.config.ts.
+/prisma/dev.db
+/prisma/dev.db-journal
+/prisma/migrations/dev.db*
+
+# One-off database exports taken during the move off Supabase. Real content,
+# and the admin password hash, so it stays out of the repo.
+/backup/
+
 # documentation — kept on disk, not in the repo. Only the README ships.
 # PRD, design notes, and the per-stage specs are working documents; AGENTS.md
 # and CLAUDE.md are rewritten locally by tooling and would churn every commit.

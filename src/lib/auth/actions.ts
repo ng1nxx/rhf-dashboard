@@ -11,6 +11,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { toAdminRole } from "@/lib/admin-role";
 import { createSession, destroySession } from "@/lib/auth/session";
 import {
   burnTimingBudget,
@@ -102,7 +103,7 @@ export async function login(
   }
 
   await clearLoginAttempts(email);
-  await createSession({ userId: user.id, role: user.role });
+  await createSession({ userId: user.id, role: toAdminRole(user.role) });
 
   redirect(safeRedirectPath(formData.get("next")?.toString() ?? null));
 }

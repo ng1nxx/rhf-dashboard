@@ -17,6 +17,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 
+import { toAdminRole, type AdminRole } from "@/lib/admin-role";
 import { readSession } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 
@@ -24,7 +25,7 @@ export type AdminSession = {
   userId: string;
   name: string;
   email: string;
-  role: "ADMIN" | "EDITOR";
+  role: AdminRole;
 };
 
 /**
@@ -49,7 +50,9 @@ export const getSession = cache(async (): Promise<AdminSession | null> => {
     userId: user.id,
     name: user.name,
     email: user.email,
-    role: user.role,
+    // Narrowed rather than cast: the column is a plain string on SQLite, so
+    // nothing at the database level stops it holding something unexpected.
+    role: toAdminRole(user.role),
   };
 });
 

@@ -1,11 +1,14 @@
 // RHF Catering & Snack Box — database schema
 //
-// Mirrors the data model in PRDRhf.md §17. Written now so round 2 (the admin
-// panel) is additive rather than a redesign; no application code reads from
-// the database yet.
+// Mirrors the data model in PRDRhf.md §17.
 //
-// Target: PostgreSQL on Neon or Supabase. Set DATABASE_URL, then:
-//   npx prisma migrate dev --name init
+// Target: Turso (libSQL, which is SQLite). The application reaches it through
+// the libSQL driver adapter in `src/lib/db.ts`; the Prisma CLI cannot — it does
+// not speak `libsql://` — so migrations are authored against a local SQLite
+// file and applied to Turso by `scripts/turso-migrate.mts`. See prisma.config.ts.
+//
+//   npm run db:migrate        # author a migration against prisma/dev.db
+//   npm run db:push-turso     # apply pending migrations to Turso
 //   npm run db:seed
 
 generator client {
@@ -16,23 +19,21 @@ generator client {
 // Prisma 7 no longer accepts `url` here — the connection string for migrate
 // lives in prisma.config.ts, and the runtime client is given a driver adapter.
 datasource db {
-  provider = "postgresql"
-}
-
-enum AdminRole {
-  ADMIN
-  EDITOR
+  provider = "sqlite"
 }
 
 /// Admin panel user — PRD §17.1. Passwords are stored hashed (PRD §21).
 model AdminUser {
-  id           String    @id @default(cuid())
+  id           String   @id @default(cuid())
   name         String
-  email        String    @unique
+  email        String   @unique
   passwordHash String
-  role         AdminRole @default(ADMIN)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  /// One of ADMIN_ROLES in `src/lib/admin-role.ts`. A plain string because
+  /// SQLite has no enum type and Prisma does not emulate one — the values are
+  /// constrained by the Zod schema that guards every write instead.
+  role         String   @default("ADMIN")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@map("admin_users")
 }
@@ -91,10 +92,16 @@ model MenuItem {
   /// is null; together they produce the customer-facing label in the mapper.
   priceUnit        String?
   minOrder         String?
-  packageItems     String[] @default([])
+  /// A JSON array of strings — SQLite has no list type. Read and written only
+  /// through `parseList`/`serializeList` in `src/lib/json-list.ts`, so the
+  /// encoding is defined in exactly one place and the public `MenuItem` type
+  /// still hands pages a `string[]`.
+  packageItems     String   @default("[]")
   imageUrl         String?
-  galleryImages    String[] @default([])
-  tags             String[] @default([])
+  /// JSON array of Cloudinary URLs — see `packageItems`.
+  galleryImages    String   @default("[]")
+  /// JSON array of badge labels — see `packageItems`.
+  tags             String   @default("[]")
   suitableFor      String?
   isFeatured       Boolean  @default(false)
   isPublished      Boolean  @default(true)

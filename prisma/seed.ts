@@ -2,7 +2,7 @@
  * Database seed — PRD §23.
  *
  * Loads the same content the site currently renders from `src/lib/seed/` into
- * PostgreSQL, so the switch from seed modules to the database is invisible to
+ * Turso, so the switch from seed modules to the database is invisible to
  * visitors. Idempotent: every write is an upsert keyed on a stable id or slug,
  * so re-running never duplicates rows.
  *
@@ -11,10 +11,11 @@
  * Note: seeded testimonials are placeholders, not real customer quotes. See
  * PRELAUNCH.md before going live.
  */
-import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaLibSql } from "@prisma/adapter-libsql";
 import bcrypt from "bcryptjs";
 
 import { PrismaClient } from "../src/generated/prisma/client";
+import { serializeList } from "../src/lib/json-list";
 
 import { CATEGORIES } from "../src/lib/seed/categories";
 import { CLIENTS } from "../src/lib/seed/clients";
@@ -24,18 +25,20 @@ import { MENU_ITEMS } from "../src/lib/seed/menu-items";
 import { SITE_SETTINGS } from "../src/lib/seed/site-settings";
 import { TESTIMONIALS } from "../src/lib/seed/testimonials";
 
-// Seeding writes a lot of rows in sequence, so it uses DIRECT_URL for the same
-// reason migrations do: pgBouncer's transaction mode is a poor fit for it.
-// Prisma 7 requires an explicit driver adapter — there is no engine to hand a
-// bare connection string to any more.
-const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
+// Writes go to Turso, the same database the application uses — Prisma 7 needs
+// an explicit driver adapter, there is no engine to hand a bare connection
+// string to any more.
+const url = process.env.TURSO_DATABASE_URL;
+const authToken = process.env.TURSO_AUTH_TOKEN;
 
-if (!connectionString) {
-  throw new Error("DIRECT_URL (atau DATABASE_URL) belum diset di .env.local.");
+if (!url || !authToken) {
+  throw new Error(
+    "TURSO_DATABASE_URL / TURSO_AUTH_TOKEN belum diset di .env.local.",
+  );
 }
 
 const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString }),
+  adapter: new PrismaLibSql({ url, authToken }),
 });
 
 async function main() {
@@ -57,7 +60,16 @@ async function main() {
 
   console.log(`Seeding ${MENU_ITEMS.length} menu items…`);
   for (const item of MENU_ITEMS) {
-    const { categoryIds, createdAt, ...fields } = item;
+    const { categoryIds, createdAt, packageItems, galleryImages, tags, ...rest } =
+      item;
+
+    // The three list columns hold JSON on SQLite — see src/lib/json-list.ts.
+    const fields = {
+      ...rest,
+      packageItems: serializeList(packageItems ?? []),
+      galleryImages: serializeList(galleryImages ?? []),
+      tags: serializeList(tags ?? []),
+    };
 
     await prisma.menuItem.upsert({
       where: { id: item.id },
@@ -66,14 +78,15 @@ async function main() {
     });
 
     // Replace the category links wholesale so a re-run reflects the current
-    // seed rather than accumulating stale associations.
+    // seed rather than accumulating stale associations. Deleting first means
+    // there is nothing left to collide with, so no `skipDuplicates` is needed —
+    // which SQLite does not support anyway.
     await prisma.menuItemCategory.deleteMany({ where: { menuItemId: item.id } });
     await prisma.menuItemCategory.createMany({
       data: categoryIds.map((categoryId) => ({
         menuItemId: item.id,
         categoryId,
       })),
-      skipDuplicates: true,
     });
   }
 

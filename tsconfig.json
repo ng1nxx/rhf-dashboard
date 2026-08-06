@@ -11,6 +11,10 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    // The scripts in `scripts/` run under Node's type stripping, which resolves
+    // import paths literally and so needs the real `.ts` extension. Safe here
+    // because nothing is emitted — `noEmit` is on and Next compiles the app.
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "incremental": true,
     "plugins": [

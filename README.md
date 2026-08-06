@@ -2,11 +2,11 @@
 
 Website resmi RHF Catering & Snack Box, Kabupaten Tegal. Company profile, katalog menu, galeri, dan jalur pemesanan via WhatsApp.
 
-Dibangun mengikuti [`PRDRhf.md`](PRDRhf.md), [`PromtCatering.md`](PromtCatering.md), dan [`DesignRHF.md`](DesignRHF.md). Keputusan desain yang tidak tercakup ketiga dokumen tersebut dicatat di [`docs/specs/`](docs/specs/2026-08-04-rhf-catering-public-website-design.md).
+Dibangun mengikuti `PRDRhf.md`, `PromtCatering.md`, dan `DesignRHF.md`. Keputusan desain yang tidak tercakup ketiga dokumen itu dicatat di `docs/specs/`. Semuanya dokumen kerja internal dan sengaja tidak ikut di-commit — lihat `.gitignore`.
 
-> **Status:** Ronde 1 selesai. Ronde 2 sedang berjalan — tahap 1 (database), 2 (autentikasi), 3 (dashboard), dan 4a (CRUD kategori, galeri, testimoni, client, FAQ) selesai. CRUD menu, site settings, dan upload gambar menyusul. Lihat [Yang sudah selesai & TODO](#yang-sudah-selesai--todo) dan [desain ronde 2](docs/specs/2026-08-04-rhf-admin-panel-round-2-design.md).
+> **Status:** Ronde 1 selesai. Ronde 2 hampir selesai — database, autentikasi, dashboard, CRUD keenam entitas, tabel berpaginasi, form dalam drawer, dan unggah gambar ke Cloudinary sudah jalan. Tersisa pengaturan situs dan role EDITOR.
 >
-> **Sebelum launch:** baca [`PRELAUNCH.md`](PRELAUNCH.md). Ada data placeholder yang wajib diganti.
+> **Sebelum launch:** baca `PRELAUNCH.md`. Ada data placeholder yang wajib diganti.
 
 ---
 
@@ -20,7 +20,7 @@ Dibangun mengikuti [`PRDRhf.md`](PRDRhf.md), [`PromtCatering.md`](PromtCatering.
 | Komponen | shadcn/ui (Radix primitives) |
 | Font | Poppins (heading) + Inter (body), self-hosted via `next/font` |
 | Ikon | Lucide |
-| Database | PostgreSQL (Supabase) via Prisma 7 + `@prisma/adapter-pg` — *aktif* |
+| Database | Turso (libSQL/SQLite) via Prisma 7 + `@prisma/adapter-libsql` — *aktif* |
 | Image storage | Cloudinary — *disiapkan, belum aktif* |
 | Deployment | Vercel |
 
@@ -35,14 +35,14 @@ npm run dev
 
 Buka <http://localhost:3000>.
 
-**Database wajib.** Sejak ronde 2 tahap 1, seluruh konten publik dibaca dari PostgreSQL — bukan lagi dari `src/lib/seed/`. Salin `.env.example` ke `.env.local`, isi `DATABASE_URL` dan `DIRECT_URL`, lalu:
+**Database wajib.** Seluruh konten publik dibaca dari database — bukan lagi dari `src/lib/seed/`. Salin `.env.example` ke `.env.local`, isi `TURSO_DATABASE_URL` dan `TURSO_AUTH_TOKEN` dari dashboard Turso, lalu:
 
 ```bash
-npm run db:migrate   # buat tabel
-npm run db:seed      # isi konten awal
+npm run db:push-turso   # buat tabel di Turso
+npm run db:seed         # isi konten awal
 ```
 
-Tanpa `DATABASE_URL`, `npm run dev` dan `npm run build` akan gagal dengan pesan yang menyebutkan variabel mana yang kurang.
+Tanpa kredensial Turso, `npm run dev` dan `npm run build` akan gagal dengan pesan yang menyebutkan variabel mana yang kurang.
 
 Perintah lain:
 
@@ -153,7 +153,7 @@ Satu lagi: `npx shadcn add` juga menawarkan menimpa `button.tsx`, yang memuat va
 Halaman **tidak pernah** membaca sumber data secara langsung. Semua lewat `src/lib/repositories/`:
 
 ```
-app/**/page.tsx  →  lib/repositories/*.ts  →  lib/db.ts  →  PostgreSQL
+app/**/page.tsx  →  lib/repositories/*.ts  →  lib/db.ts  →  Turso
 ```
 
 Karena tanda tangan fungsi dan tipe kembalian repository tidak berubah saat pindah ke database, tidak ada satu pun halaman atau komponen yang perlu diedit. Perbedaan bentuk data (`null` vs optional, `Date` vs ISO string, kategori dari join table) diterjemahkan di `repositories/mappers.ts`.
@@ -178,8 +178,8 @@ Salin `.env.example` menjadi `.env.local`.
 | Variabel | Kapan dibutuhkan | Keterangan |
 |---|---|---|
 | `NEXT_PUBLIC_SITE_URL` | Opsional | Origin kanonik untuk metadata, sitemap, dan JSON-LD. Di Vercel terdeteksi otomatis; isi setelah domain kustom aktif. |
-| `DATABASE_URL` | **Wajib** | Connection string PostgreSQL. Lewat pooler Supabase (`:6543`), wajib membawa `?pgbouncer=true`. Dipakai runtime aplikasi. |
-| `DIRECT_URL` | **Wajib** | Koneksi non-pooled ke database yang sama. Dipakai `prisma migrate` dan `db:seed` — pgBouncer mode transaksi tidak bisa memegang advisory lock yang dibutuhkan migrasi. |
+| `TURSO_DATABASE_URL` | **Wajib** | URL database Turso, bentuk `libsql://nama-org.wilayah.turso.io`. Dipakai aplikasi dan skrip migrasi. |
+| `TURSO_AUTH_TOKEN` | **Wajib** | Token dari `turso db tokens create <nama-db>` atau dashboard. |
 | `AUTH_SECRET` | **Wajib** | Kunci penanda tangan session. `openssl rand -base64 32`. Mengubahnya membuat seluruh session yang sedang berjalan tidak valid — efektif memaksa semua admin login ulang. |
 | `AUTH_URL` | Opsional | URL aplikasi. Belum dibaca kode; disiapkan untuk kebutuhan absolute URL nanti. |
 | `ADMIN_EMAIL` | Sekali, saat bootstrap | Akun admin pertama, dibuat oleh `npm run db:seed`. |
@@ -190,14 +190,44 @@ Salin `.env.example` menjadi `.env.local`.
 
 ## Database
 
-Seluruh konten publik dibaca dari PostgreSQL.
+Seluruh konten publik dibaca dari Turso (libSQL, yaitu SQLite).
 
 ```bash
-npm run db:migrate   # terapkan migrasi (pakai DIRECT_URL)
-npm run db:seed      # isi konten awal dari src/lib/seed/
-npm run db:studio    # lihat isi database
-npm run db:generate  # regenerate Prisma client setelah schema berubah
+npm run db:migrate      # tulis migrasi baru — terhadap prisma/dev.db
+npm run db:push-turso   # terapkan migrasi yang belum jalan ke Turso
+npm run db:seed         # isi konten awal dari src/lib/seed/
+npm run db:studio       # lihat isi prisma/dev.db (bukan Turso)
+npm run db:generate     # regenerate Prisma client setelah schema berubah
 ```
+
+### Kenapa migrasi butuh dua perintah
+
+Prisma CLI tidak bisa menghubungi Turso: `datasource` di `prisma.config.ts`
+hanya menerima URL, dan schema engine-nya tidak mengerti `libsql://` maupun
+bearer token. Driver adapter menyelesaikan ini untuk aplikasi saat runtime,
+tapi tidak ada tempat untuk menyerahkannya ke CLI.
+
+Jadi migrasi ditulis terhadap `prisma/dev.db` — berkas SQLite lokal yang satu-
+satunya tugasnya memberi `prisma migrate dev` sesuatu untuk dibandingkan — lalu
+SQL-nya diterapkan ke Turso oleh `scripts/turso-migrate.mts`. Berkas itu tidak
+pernah dibaca aplikasi; `src/lib/db.ts` selalu bicara ke Turso.
+
+**Setelah mengubah `schema.prisma`, jalankan keduanya.** `db:migrate` saja tidak
+mengubah database sungguhan. Migrasi yang sudah diterapkan dicatat di tabel
+`_turso_migrations`, jadi `db:push-turso` aman dijalankan berulang.
+
+### Batasan SQLite yang membentuk skema
+
+Tiga hal tidak ada di SQLite dan sudah diakali:
+
+| | Cara sekarang |
+|---|---|
+| Tipe array | `packageItems`, `galleryImages`, `tags` disimpan sebagai JSON dalam satu kolom — lihat `src/lib/json-list.ts` |
+| Enum | Kolom `role` jadi `String`; nilai sahnya di `src/lib/admin-role.ts`, dijaga Zod |
+| `mode: "insensitive"` | Tidak dipakai — `LIKE` di SQLite sudah abai huruf besar-kecil untuk ASCII |
+
+`createMany({ skipDuplicates })` juga tidak didukung; tempat yang memakainya
+menghitung selisihnya lebih dulu.
 
 Seed bersifat idempotent — aman dijalankan berulang, tidak menduplikasi baris.
 
@@ -205,7 +235,7 @@ Seed bersifat idempotent — aman dijalankan berulang, tidak menduplikasi baris.
 
 ### Catatan Prisma 7
 
-Prisma 7 menghapus engine Rust, sehingga client **wajib** diberi driver adapter — `DATABASE_URL` saja tidak cukup. Lihat `src/lib/db.ts`. Connection string untuk migrasi tidak lagi boleh berada di `schema.prisma`; tempatnya di `prisma.config.ts`.
+Prisma 7 menghapus engine Rust, sehingga client **wajib** diberi driver adapter — sebuah connection string saja tidak cukup. Lihat `src/lib/db.ts`. Datasource untuk CLI tidak lagi boleh berada di `schema.prisma`; tempatnya di `prisma.config.ts`.
 
 ### Login admin pertama kali
 
@@ -323,11 +353,24 @@ Keduanya `noindex` dan di-*disallow* di `robots.txt`. Tamu yang membuka `/admin`
 3. Isi environment variable **sebelum** deploy pertama — lihat di bawah.
 4. Deploy.
 
-Jalankan `npm run db:deploy` sebagai release step untuk menerapkan migrasi.
+Migrasi **tidak** dijalankan oleh Vercel. `prisma migrate deploy` hanya bisa
+menyentuh berkas SQLite lokal, bukan Turso. Jalankan `npm run db:push-turso`
+dari mesin sendiri sebelum deploy yang membawa perubahan skema.
+
+### Wilayah database menentukan kecepatan panel admin
+
+Tiap query ke Turso adalah satu round trip HTTP, dan satu penyimpanan di panel
+admin memakai belasan query. Jarak ke database langsung terasa: dari Indonesia
+ke database di `aws-us-east-1`, satu query ~340 ms dan satu simpan ~4,5 detik.
+
+Halaman publik hampir semuanya statis, jadi pengunjung tidak merasakannya —
+yang terasa adalah panel admin dan `/menu`. Kalau panel terasa lambat, samakan
+wilayah database Turso dengan wilayah fungsi Vercel (bawaan Vercel `iad1`,
+tetangga `aws-us-east-1`), atau pindahkan keduanya ke Singapura.
 
 ### Environment variable wajib saat build
 
-`DATABASE_URL`, `DIRECT_URL`, dan `AUTH_SECRET` harus sudah terisi sebelum
+`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, dan `AUTH_SECRET` harus sudah terisi sebelum
 build, bukan hanya saat runtime: `generateStaticParams` membaca database untuk
 menghasilkan halaman `/menu/[slug]`. Tanpa ketiganya build gagal, bukan
 menghasilkan situs kosong. Tambahkan `AUTH_URL` dan kredensial Cloudinary juga
@@ -343,11 +386,9 @@ itu `npm run build` menghasilkannya lebih dulu; tanpa itu Vercel gagal dengan
 `postinstall` melakukan hal yang sama supaya clone baru langsung bisa dipakai
 setelah `npm install`, tanpa harus ingat menjalankan `npm run db:generate`.
 
-`prisma generate` sengaja tidak memerlukan `DIRECT_URL` — ia hanya membaca
-schema dan tidak pernah membuka koneksi. Karena itu `prisma.config.ts`
-memasang `datasource` hanya kalau variabelnya ada. Kalau tidak, sebuah
-environment variable yang salah ketik akan menggagalkan `npm install` dengan
-pesan tentang parsing config, bukan tentang database.
+`prisma generate` tidak memerlukan kredensial database — ia hanya membaca schema
+dan tidak pernah membuka koneksi. Datasource di `prisma.config.ts` menunjuk
+berkas SQLite lokal, jadi `npm install` di Vercel tidak butuh env apa pun.
 
 ### Catatan rendering
 

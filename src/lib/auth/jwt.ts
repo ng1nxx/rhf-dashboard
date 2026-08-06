@@ -10,10 +10,12 @@
  */
 import { jwtVerify, SignJWT } from "jose";
 
+import type { AdminRole } from "@/lib/admin-role";
+
 /** Kept deliberately small — this travels in a cookie on every request. */
 export type SessionPayload = {
   userId: string;
-  role: "ADMIN" | "EDITOR";
+  role: AdminRole;
 };
 
 export const SESSION_COOKIE = "rhf_admin_session";

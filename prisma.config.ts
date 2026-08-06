@@ -2,9 +2,8 @@ import { defineConfig } from "prisma/config";
 
 /*
   The Prisma CLI reads `.env`; Next.js keeps local secrets in `.env.local`.
-  Loading it here means both read the same file — without this, every CLI
-  command fails with "Cannot resolve environment variable: DIRECT_URL" unless
-  the variable happens to already be exported in the shell.
+  Loading it here means both read the same file — the seed script runs under
+  this config and needs the Turso credentials.
 
   On Vercel there is no such file and the variables are already in the
   environment, which is what the empty catch is for.
@@ -18,39 +17,28 @@ try {
 /**
  * Prisma CLI configuration.
  *
- * As of Prisma 7 the datasource URL is no longer allowed in `schema.prisma`;
- * migrate and introspect read it from here, and the runtime client is
- * constructed with a driver adapter instead.
+ * The datasource here is a **local SQLite file, not Turso**, and that is
+ * deliberate.
  *
- * Migrations use DIRECT_URL, not DATABASE_URL. Supabase's DATABASE_URL points
- * at pgBouncer in transaction mode (port 6543), which cannot hold the session
- * state or advisory locks that `prisma migrate` needs. DIRECT_URL is the
- * non-pooled connection to the same database.
+ * The Prisma CLI has no way to reach Turso: `datasource` accepts only a URL,
+ * and the schema engine does not understand `libsql://` or bearer tokens.
+ * Driver adapters solve this for the application at runtime, but there is no
+ * slot to hand one to the CLI.
  *
- * The application runtime is the other way around: it goes through the pooler,
- * because serverless functions open far more connections than Postgres will
- * accept directly. See `src/lib/db.ts`.
+ * So migrations are authored against `prisma/dev.db` — a throwaway file whose
+ * only job is to give `prisma migrate dev` something to diff against — and the
+ * SQL it produces is applied to Turso by `scripts/turso-migrate.mts`. The file
+ * is never read by the application; `src/lib/db.ts` always talks to Turso, so
+ * there is still exactly one source of truth.
+ *
+ * Practical consequence: after `npm run db:migrate` you must also run
+ * `npm run db:push-turso`, or the real database will not have the change.
  */
-
-/*
-  Read directly rather than through Prisma's `env()` helper, and attach the
-  datasource only when the variable is actually there.
-
-  `env()` throws while the config file is being loaded, which happens before
-  Prisma knows which command it is about to run. That turns a missing
-  DIRECT_URL into a failure of EVERY Prisma command — including `generate`,
-  which only reads the schema and never opens a connection. On Vercel that
-  surfaced as `npm install` dying in the postinstall hook.
-
-  Commands that genuinely need a connection (`migrate`, `db seed`, `studio`)
-  still fail without it, which is correct — but they fail on their own terms,
-  with a message about the connection rather than about config parsing.
-*/
-const directUrl = process.env.DIRECT_URL;
-
 export default defineConfig({
   schema: "prisma/schema.prisma",
-  ...(directUrl ? { datasource: { url: directUrl } } : {}),
+  datasource: {
+    url: "file:./prisma/dev.db",
+  },
   migrations: {
     seed: "tsx prisma/seed.ts",
   },

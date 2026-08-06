@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { serializeList } from "@/lib/json-list";
 import { PRICE_UNITS } from "@/lib/menu-text";
 import { GALLERY_CATEGORIES } from "@/lib/types";
 
@@ -40,21 +41,27 @@ const sortOrder = z.coerce
   .min(0, { error: "Urutan tidak boleh negatif." });
 
 /**
- * A textarea holding one list entry per line — how the three `String[]` columns
- * on MenuItem are typed in.
+ * A textarea holding one list entry per line — how the three list columns on
+ * MenuItem are typed in.
  *
  * Blank lines are dropped rather than stored: they come from a trailing return
  * or a gap left while editing, and an empty string in `packageItems` renders as
  * an empty bullet on the public detail page.
+ *
+ * Ends as a JSON string, not an array, because that is what the column holds —
+ * SQLite has no array type. Serialising here rather than at the call site means
+ * a new list field cannot be added and quietly written in the wrong shape.
  */
 const linesToArray = z
   .string()
   .trim()
   .transform((value) =>
-    value
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line !== ""),
+    serializeList(
+      value
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line !== ""),
+    ),
   );
 
 /** Lowercase, digits, and single hyphens — what the public URLs are built from. */

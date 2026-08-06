@@ -8,6 +8,7 @@ import {
   type TableParams,
 } from "@/lib/admin/pagination";
 import { db } from "@/lib/db";
+import { parseList } from "@/lib/json-list";
 
 /**
  * List reads for the admin panel.
@@ -31,9 +32,16 @@ import { db } from "@/lib/db";
 
 const bySortOrder = [{ sortOrder: "asc" }, { createdAt: "asc" }] as const;
 
-/** Postgres case-insensitive `LIKE %term%`. */
+/**
+ * `LIKE %term%`.
+ *
+ * No `mode: "insensitive"` — SQLite does not accept it, and does not need it:
+ * its `LIKE` already ignores case for ASCII, which is what Indonesian package
+ * names and descriptions are. Accented letters would not match case-insensitively,
+ * which is the one behavioural difference from Postgres and does not arise here.
+ */
 function like(q: string): Prisma.StringFilter {
-  return { contains: q, mode: "insensitive" };
+  return { contains: q };
 }
 
 /**
@@ -137,7 +145,11 @@ export async function listMenuItems(params: TableParams) {
           { name: like(params.q) },
           { description: like(params.q) },
           { slug: like(params.q) },
-          { tags: { has: params.q } },
+          // `tags` is a JSON array in one column now, so this searches the
+          // stored text rather than the elements. For badge labels that is the
+          // same answer — and a term long enough to collide with JSON syntax
+          // would not be a plausible search anyway.
+          { tags: like(params.q) },
         ],
       }
     : {};
@@ -162,8 +174,14 @@ export async function listMenuItems(params: TableParams) {
 
   return {
     ...page,
+    // The three list columns are unpacked here for the same reason the mapper
+    // unpacks them for public pages: the drawer's form seeds a textarea from
+    // `string[]`, and should not have to know the column holds JSON.
     rows: page.rows.map(({ categories, ...item }) => ({
       ...item,
+      packageItems: parseList(item.packageItems),
+      galleryImages: parseList(item.galleryImages),
+      tags: parseList(item.tags),
       categoryIds: categories.map((link) => link.category.id),
       categoryNames: categories.map((link) => link.category.name),
     })),

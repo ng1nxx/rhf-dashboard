@@ -12,6 +12,8 @@
  *   2. `createdAt` is a `Date`; `MenuItem.createdAt` is an ISO string, because
  *      it crosses the server/client boundary into the catalogue sort.
  *   3. Category membership lives in a join table, not an array column.
+ *   4. The three list columns hold JSON, because SQLite has no array type —
+ *      see `lib/json-list.ts`.
  *
  * Keeping this file the only place that knows about both shapes is what lets
  * `repositories/index.ts` keep the signatures it had in round 1.
@@ -26,6 +28,7 @@ import type {
   SiteSettings as PrismaSiteSettings,
   Testimonial as PrismaTestimonial,
 } from "@/generated/prisma/client";
+import { parseList } from "@/lib/json-list";
 import { excerpt, priceLabel } from "@/lib/menu-text";
 import type {
   Client,
@@ -70,11 +73,11 @@ export function toMenuItem(row: MenuItemRow): MenuItem {
     price: opt(row.price),
     priceLabel: priceLabel(row.price, row.priceUnit),
     minOrder: opt(row.minOrder),
-    packageItems: row.packageItems,
+    packageItems: parseList(row.packageItems),
     imageUrl: opt(row.imageUrl),
-    galleryImages: row.galleryImages,
+    galleryImages: parseList(row.galleryImages),
     categoryIds: row.categories.map((link) => link.categoryId),
-    tags: row.tags,
+    tags: parseList(row.tags),
     suitableFor: opt(row.suitableFor),
     isFeatured: row.isFeatured,
     isPublished: row.isPublished,

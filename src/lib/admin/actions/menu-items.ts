@@ -115,10 +115,31 @@ export async function updateMenuItem(
           where: { menuItemId: id, categoryId: { notIn: categoryIds } },
         });
 
-        await tx.menuItemCategory.createMany({
-          data: categoryIds.map((categoryId) => ({ menuItemId: id, categoryId })),
-          skipDuplicates: true,
-        });
+        /*
+          The rows that survived the delete are read back and skipped, rather
+          than re-inserted with `skipDuplicates`. SQLite does not support that
+          option, and inserting a row that is already there would violate the
+          composite primary key and abort the whole transaction — silently
+          turning "save" into "nothing changed".
+        */
+        const existing = new Set(
+          (
+            await tx.menuItemCategory.findMany({
+              where: { menuItemId: id },
+              select: { categoryId: true },
+            })
+          ).map((link) => link.categoryId),
+        );
+
+        const missing = categoryIds.filter(
+          (categoryId) => !existing.has(categoryId),
+        );
+
+        if (missing.length > 0) {
+          await tx.menuItemCategory.createMany({
+            data: missing.map((categoryId) => ({ menuItemId: id, categoryId })),
+          });
+        }
       });
     },
   );
