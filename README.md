@@ -320,10 +320,28 @@ Keduanya `noindex` dan di-*disallow* di `robots.txt`. Tamu yang membuka `/admin`
 
 1. Push repository ke GitHub.
 2. Di Vercel pilih **Add New → Project**, lalu pilih repository ini. Framework terdeteksi sebagai Next.js; build command tidak perlu diubah.
-3. Ronde 1 tidak memerlukan environment variable. Setelah domain kustom aktif, tambahkan `NEXT_PUBLIC_SITE_URL` agar sitemap dan metadata memakai domain yang benar.
+3. Isi environment variable **sebelum** deploy pertama — lihat di bawah.
 4. Deploy.
 
-Untuk ronde 2, tambahkan `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, `AUTH_URL`, dan kredensial Cloudinary, lalu jalankan `npm run db:deploy` sebagai bagian dari build atau release step.
+Jalankan `npm run db:deploy` sebagai release step untuk menerapkan migrasi.
+
+### Environment variable wajib saat build
+
+`DATABASE_URL`, `DIRECT_URL`, dan `AUTH_SECRET` harus sudah terisi sebelum
+build, bukan hanya saat runtime: `generateStaticParams` membaca database untuk
+menghasilkan halaman `/menu/[slug]`. Tanpa ketiganya build gagal, bukan
+menghasilkan situs kosong. Tambahkan `AUTH_URL` dan kredensial Cloudinary juga
+kalau panel admin ikut dipakai.
+
+### Kenapa `build` menjalankan `prisma generate`
+
+Client Prisma di-generate ke `src/generated/`, yang **tidak ikut di-commit** —
+isinya turunan dari `prisma/schema.prisma` dan spesifik per platform. Karena
+itu `npm run build` menghasilkannya lebih dulu; tanpa itu Vercel gagal dengan
+`Module not found: ./src/generated/prisma/client` di `src/lib/db.ts`.
+
+`postinstall` melakukan hal yang sama supaya clone baru langsung bisa dipakai
+setelah `npm install`, tanpa harus ingat menjalankan `npm run db:generate`.
 
 ### Catatan rendering
 

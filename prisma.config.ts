@@ -1,5 +1,20 @@
 import { defineConfig, env } from "prisma/config";
 
+/*
+  The Prisma CLI reads `.env`; Next.js keeps local secrets in `.env.local`.
+  Loading it here means both read the same file — without this, every CLI
+  command fails with "Cannot resolve environment variable: DIRECT_URL" unless
+  the variable happens to already be exported in the shell.
+
+  On Vercel there is no such file and the variables are already in the
+  environment, which is what the empty catch is for.
+*/
+try {
+  process.loadEnvFile(".env.local");
+} catch {
+  // No local env file — nothing to load.
+}
+
 /**
  * Prisma CLI configuration.
  *
