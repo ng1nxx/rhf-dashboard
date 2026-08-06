@@ -1,4 +1,4 @@
-import { defineConfig, env } from "prisma/config";
+import { defineConfig } from "prisma/config";
 
 /*
   The Prisma CLI reads `.env`; Next.js keeps local secrets in `.env.local`.
@@ -31,11 +31,26 @@ try {
  * because serverless functions open far more connections than Postgres will
  * accept directly. See `src/lib/db.ts`.
  */
+
+/*
+  Read directly rather than through Prisma's `env()` helper, and attach the
+  datasource only when the variable is actually there.
+
+  `env()` throws while the config file is being loaded, which happens before
+  Prisma knows which command it is about to run. That turns a missing
+  DIRECT_URL into a failure of EVERY Prisma command — including `generate`,
+  which only reads the schema and never opens a connection. On Vercel that
+  surfaced as `npm install` dying in the postinstall hook.
+
+  Commands that genuinely need a connection (`migrate`, `db seed`, `studio`)
+  still fail without it, which is correct — but they fail on their own terms,
+  with a message about the connection rather than about config parsing.
+*/
+const directUrl = process.env.DIRECT_URL;
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
-  datasource: {
-    url: env("DIRECT_URL"),
-  },
+  ...(directUrl ? { datasource: { url: directUrl } } : {}),
   migrations: {
     seed: "tsx prisma/seed.ts",
   },

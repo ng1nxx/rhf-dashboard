@@ -343,6 +343,12 @@ itu `npm run build` menghasilkannya lebih dulu; tanpa itu Vercel gagal dengan
 `postinstall` melakukan hal yang sama supaya clone baru langsung bisa dipakai
 setelah `npm install`, tanpa harus ingat menjalankan `npm run db:generate`.
 
+`prisma generate` sengaja tidak memerlukan `DIRECT_URL` — ia hanya membaca
+schema dan tidak pernah membuka koneksi. Karena itu `prisma.config.ts`
+memasang `datasource` hanya kalau variabelnya ada. Kalau tidak, sebuah
+environment variable yang salah ketik akan menggagalkan `npm install` dengan
+pesan tentang parsing config, bukan tentang database.
+
 ### Catatan rendering
 
 Seluruh halaman publik di-prerender statis kecuali `/menu`, yang dirender per-request karena membaca query string untuk filter awal. Ini disengaja: hasil filter jadi bisa dibagikan lewat URL dan ter-render di server untuk SEO.
